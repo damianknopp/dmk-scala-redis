@@ -38,12 +38,11 @@ object SimpleJedisClient {
     val jedis = pool.getResource
     try {
       val key = "foo"
-      jedis.set(key, "bar")
+      val expireSecs = 1
+      jedis.set(key, "bar", "NX", "PX", expireSecs)
       val value = jedis.get(key)
       println(s"key foo has value: $value")
 
-      val expireSecs = 1
-      jedis.expire(key, expireSecs)
       val ttl = jedis.ttl(key)
       println(s"ttl is $ttl")
       Thread.sleep(expireSecs * 1000)
