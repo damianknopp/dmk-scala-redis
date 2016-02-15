@@ -26,6 +26,7 @@ object SimpleJedisClient {
     try {
       keyval(pool)
       hll(pool)
+      writeDataPipeline(pool, 10000)
     } finally {
       if (pool != null) {
         pool.destroy()
@@ -33,7 +34,7 @@ object SimpleJedisClient {
     }
   }
 
-  def keyval(pool : JedisPool) : Unit = {
+  def keyval(pool: JedisPool): Unit = {
     println("key value")
     val jedis = pool.getResource
     try {
@@ -47,7 +48,7 @@ object SimpleJedisClient {
       println(s"ttl is $ttl")
       Thread.sleep(expireSecs * 1000)
       val exists = jedis.exists(key)
-      if(!exists) {
+      if (!exists) {
         println(s"$key has expired")
       } else {
         println(s"$key has not expired!, expected to expire in ${jedis.ttl(key)}")
@@ -60,7 +61,42 @@ object SimpleJedisClient {
 
   }
 
-  def hll(pool: JedisPool) : Unit = {
+  def writeDataPipeline(pool: JedisPool, num: Int): Unit = {
+    println("write datapipeline")
+    val jedis = pool.getResource
+    val pipeline = jedis.pipelined()
+    try {
+      val res = pipeline.multi()
+      val expireSecs = 60 * 5
+      val keyPrefix = "key:"
+      val r = (0 until num)
+      r.foreach { i =>
+        val key = s"$keyPrefix$i"
+        println(s"setting $key")
+        pipeline.set(key, s"val-$i", "NX", "EX", expireSecs)
+      }
+      pipeline.exec()
+
+      pipeline.multi()
+      r.foreach { i => 
+        val key = s"$keyPrefix$i"
+        val value = pipeline.get(key).toString()
+        println(s"$key $value")
+      }
+      pipeline.exec()
+    } finally {
+      if (pipeline != null) {
+        pipeline.clear()
+        pipeline.close()
+      }
+      if (jedis != null) {
+        jedis.close
+      }
+    }
+
+  }
+
+  def hll(pool: JedisPool): Unit = {
     println("hyperloglog")
     val jedis = pool.getResource
     try {
